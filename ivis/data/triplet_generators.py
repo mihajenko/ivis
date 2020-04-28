@@ -14,13 +14,11 @@ a concern, dynamically generated triplets can be useful.
 """
 
 import numpy as np
-from .knn import extract_knn
-from annoy import AnnoyIndex
 from tensorflow.keras.utils import Sequence
 from scipy.sparse import issparse
 
 
-def generator_from_index(X, Y, index_path, k, batch_size, search_k=-1,
+def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
                          precompute=True, verbose=1):
     if k >= X.shape[0] - 1:
         raise Exception('''k value greater than or equal to (num_rows - 1)
@@ -36,13 +34,12 @@ def generator_from_index(X, Y, index_path, k, batch_size, search_k=-1,
             if verbose > 0:
                 print('Extracting KNN from index')
 
-            neighbour_matrix = extract_knn(X, index_path, k=k,
-                                           search_k=search_k, verbose=verbose)
+            neighbour_matrix = index_backend.extract_knn(k=k,
+                                                         search_k=search_k)
             return KnnTripletGenerator(X, neighbour_matrix,
                                        batch_size=batch_size)
         else:
-            index = AnnoyIndex(X.shape[1], metric='angular')
-            index.load(index_path)
+            index = index_backend.load()
             return AnnoyTripletGenerator(X, index, k=k,
                                          batch_size=batch_size,
                                          search_k=search_k)
@@ -51,13 +48,12 @@ def generator_from_index(X, Y, index_path, k, batch_size, search_k=-1,
             if verbose > 0:
                 print('Extracting KNN from index')
 
-            neighbour_matrix = extract_knn(X, index_path, k=k,
-                                           search_k=search_k, verbose=verbose)
+            neighbour_matrix = index_backend.extract_knn(k=k,
+                                                         search_k=search_k)
             return LabeledKnnTripletGenerator(X, Y, neighbour_matrix,
                                               batch_size=batch_size)
         else:
-            index = AnnoyIndex(X.shape[1], metric='angular')
-            index.load(index_path)
+            index = index_backend.load()
             return LabeledAnnoyTripletGenerator(X, Y, index,
                                                 k=k, batch_size=batch_size,
                                                 search_k=search_k)

@@ -4,7 +4,8 @@ from .nn.network import triplet_network, base_network
 from .nn.callbacks import ModelCheckpoint
 from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
 from .nn.losses import semi_supervised_loss, validate_sparse_labels
-from .data.knn import build_annoy_index
+from data.knn_backend.annoy import AnnoyBackend
+from data.knn_backend.ngt import NGTBackend
 
 from tensorflow import keras
 from tensorflow.keras.callbacks import EarlyStopping
@@ -76,7 +77,7 @@ class Ivis(BaseEstimator):
         weighting to give to classification vs triplet loss when training
         in supervised mode. The higher the weight, the more classification
         influences training. Ignored if using Ivis in unsupervised mode.
-    :param str annoy_index_path: The filepath of a pre-trained annoy index file
+    :param str index_path: The filepath of a pre-trained annoy index file
         saved on disk. If provided, the annoy index file will be used.
         Otherwise, a new index will be generated and saved to disk in the
         current directory as 'annoy.index'.
@@ -98,8 +99,9 @@ class Ivis(BaseEstimator):
                  margin=1, ntrees=50, search_k=-1,
                  precompute=True, model='szubert',
                  supervision_metric='sparse_categorical_crossentropy',
-                 supervision_weight=0.5, annoy_index_path=None,
-                 callbacks=[], build_index_on_disk=None, verbose=1):
+                 supervision_weight=0.5, index_path=None,
+                 callbacks=[], build_index_on_disk=None, verbose=1,
+                 index_backend='annoy'):
 
         self.embedding_dims = embedding_dims
         self.k = k
@@ -118,7 +120,8 @@ class Ivis(BaseEstimator):
         self.supervision_weight = supervision_weight
         self.supervised_model_ = None
         self.loss_history_ = []
-        self.annoy_index_path = annoy_index_path
+        self.index_backend = index_backend
+        self.index_path = index_path
         self.callbacks = callbacks
         for callback in self.callbacks:
             if isinstance(callback, ModelCheckpoint):
@@ -146,18 +149,33 @@ class Ivis(BaseEstimator):
         return state
 
     def _fit(self, X, Y=None, shuffle_mode=True):
-
-        if self.annoy_index_path is None:
-            self.annoy_index_path = 'annoy.index'
-            if self.verbose > 0:
-                print('Building KNN index')
-            build_annoy_index(X, self.annoy_index_path,
+        if self.index_backend == 'ngt':
+            self.index_path = 'ngt.index'
+            be = NGTBackend(X, self.index_path,
+                            distance_metric='Jaccard',
+                            ntrees=self.ntrees,
+                            verbose=self.verbose)
+            if self.index_path is None:
+                if self.verbose > 0:
+                    print('Building KNN index')
+                be.build_index()
+            else:
+                be.load_index()
+        else:
+            self.index_path = 'annoy.index'
+            be = AnnoyBackend(X, self.index_path,
+                              distance_metric='angular',
                               ntrees=self.ntrees,
-                              build_index_on_disk=self.build_index_on_disk,
                               verbose=self.verbose)
+            if self.index_path is None:
+                if self.verbose > 0:
+                    print('Building KNN index')
+                be.build_index(build_index_on_disk=self.build_index_on_disk)
+            else:
+                be.load_index()
 
         datagen = generator_from_index(X, Y,
-                                       index_path=self.annoy_index_path,
+                                       index_backend=be,
                                        k=self.k,
                                        batch_size=self.batch_size,
                                        search_k=self.search_k,
