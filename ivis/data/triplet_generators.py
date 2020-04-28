@@ -39,7 +39,7 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
             return KnnTripletGenerator(X, neighbour_matrix,
                                        batch_size=batch_size)
         else:
-            index = index_backend.load()
+            index = index_backend.load_index()
             return AnnoyTripletGenerator(X, index, k=k,
                                          batch_size=batch_size,
                                          search_k=search_k)
@@ -53,7 +53,7 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
             return LabeledKnnTripletGenerator(X, Y, neighbour_matrix,
                                               batch_size=batch_size)
         else:
-            index = index_backend.load()
+            index = index_backend.load_index()
             return LabeledAnnoyTripletGenerator(X, Y, index,
                                                 k=k, batch_size=batch_size,
                                                 search_k=search_k)
