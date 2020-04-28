@@ -94,7 +94,8 @@ class Ivis(BaseEstimator):
 
     """
 
-    def __init__(self, embedding_dims=2, k=150, distance='pn', batch_size=128,
+    def __init__(self, embedding_dims=2, k=150,
+                 knn_metric='angular', distance='pn', batch_size=128,
                  epochs=1000, n_epochs_without_progress=20,
                  margin=1, ntrees=50, search_k=-1,
                  precompute=True, model='szubert',
@@ -105,6 +106,7 @@ class Ivis(BaseEstimator):
 
         self.embedding_dims = embedding_dims
         self.k = k
+        self.knn_metric = knn_metric
         self.distance = distance
         self.batch_size = batch_size
         self.epochs = epochs
@@ -150,32 +152,33 @@ class Ivis(BaseEstimator):
 
     def _fit(self, X, Y=None, shuffle_mode=True):
         if self.index_backend == 'ngt':
-            self.index_path = 'ngt.index'
-            be = NGTBackend(X, self.index_path,
-                            distance_metric='Jaccard',
-                            ntrees=self.ntrees,
-                            verbose=self.verbose)
-            if self.index_path is None:
-                if self.verbose > 0:
-                    print('Building KNN index')
-                be.build_index()
-            else:
-                be.load_index()
+            backend_cls = NGTBackend
+            tmp_index_path = 'ngt.index'
         else:
-            self.index_path = 'annoy.index'
-            be = AnnoyBackend(X, self.index_path,
-                              distance_metric='angular',
-                              ntrees=self.ntrees,
-                              verbose=self.verbose)
-            if self.index_path is None:
-                if self.verbose > 0:
-                    print('Building KNN index')
-                be.build_index(build_index_on_disk=self.build_index_on_disk)
+            backend_cls = AnnoyBackend
+            tmp_index_path = 'annoy.index'
+
+        build_knn = False
+        if self.index_path is None:
+            self.index_path = tmp_index_path
+            build_knn = True
+
+        index_backend = backend_cls(X, self.index_path,
+                                    distance_metric=self.knn_metric,
+                                    ntrees=self.ntrees,
+                                    verbose=self.verbose)
+
+        if build_knn:
+            if self.verbose > 0:
+                print('Building KNN index')
+            if self.index_backend == 'annoy':
+                index_backend.build_index(
+                    build_index_on_disk=self.build_index_on_disk)
             else:
-                be.load_index()
+                index_backend.build_index()
 
         datagen = generator_from_index(X, Y,
-                                       index_backend=be,
+                                       index_backend=index_backend,
                                        k=self.k,
                                        batch_size=self.batch_size,
                                        search_k=self.search_k,
