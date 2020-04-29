@@ -3,7 +3,7 @@ import pytest
 
 from sklearn import datasets
 
-from data.knn_backend.annoy import AnnoyBackend
+from ivis.data.knn_backend.annoy import AnnoyBackend
 from ivis.data.triplet_generators import generator_from_index
 from ivis.data.triplet_generators import KnnTripletGenerator
 from ivis.data.triplet_generators import AnnoyTripletGenerator

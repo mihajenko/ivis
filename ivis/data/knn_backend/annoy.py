@@ -1,15 +1,15 @@
 """ KNN retrieval using an Annoy index. """
 
+import time
 import numpy as np
 from scipy.sparse import issparse
 from annoy import AnnoyIndex
 from multiprocessing import Process, cpu_count, Queue
 from operator import attrgetter
 from tqdm import tqdm
-import time
 
-from data.knn_backend.abstract import KnnBackend
-from data.knn_backend.abstract import IndexBuildingError, IndexNeighbours
+from .abstract import KnnBackend
+from .abstract import IndexBuildingError, IndexNeighbours
 
 
 class AnnoyBackend(KnnBackend):

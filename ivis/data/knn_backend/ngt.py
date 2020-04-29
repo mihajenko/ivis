@@ -6,8 +6,8 @@ from operator import attrgetter
 from scipy.sparse import issparse
 from tqdm import tqdm
 
-from data.knn_backend.abstract import KnnBackend
-from data.knn_backend.abstract import IndexNeighbours, IndexBuildingError
+from .abstract import KnnBackend
+from .abstract import IndexNeighbours, IndexBuildingError
 
 
 class NGTBackend(KnnBackend):

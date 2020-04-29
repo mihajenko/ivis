@@ -1,27 +1,26 @@
 """ scikit-learn wrapper class for the Ivis algorithm. """
-from .data.triplet_generators import generator_from_index
-from .nn.network import triplet_network, base_network
-from .nn.callbacks import ModelCheckpoint
-from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
-from .nn.losses import semi_supervised_loss, validate_sparse_labels
-from data.knn_backend.annoy import AnnoyBackend
-from data.knn_backend.ngt import NGTBackend
-
-from tensorflow import keras
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.models import load_model, Model
-from tensorflow.keras.layers import Dense, Input
-from tensorflow.keras import regularizers
-import numpy as np
-
-from sklearn.base import BaseEstimator
-
 import json
 import os
 import shutil
 import multiprocessing
 import tensorflow as tf
 import platform
+
+import numpy as np
+from sklearn.base import BaseEstimator
+from tensorflow import keras
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.models import load_model, Model
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras import regularizers
+
+from .data.knn_backend.annoy import AnnoyBackend
+from .data.knn_backend.ngt import NGTBackend
+from .data.triplet_generators import generator_from_index
+from .nn.network import triplet_network, base_network
+from .nn.callbacks import ModelCheckpoint
+from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
+from .nn.losses import semi_supervised_loss, validate_sparse_labels
 
 
 class Ivis(BaseEstimator):

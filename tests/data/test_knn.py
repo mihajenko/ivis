@@ -8,8 +8,8 @@ from annoy import AnnoyIndex
 from scipy.sparse import csr_matrix
 from sklearn import datasets
 
-from data.knn_backend.annoy import AnnoyBackend
-from data.knn_backend.ngt import NGTBackend
+from ivis.data.knn_backend.annoy import AnnoyBackend
+from ivis.data.knn_backend.ngt import NGTBackend
 
 
 @pytest.fixture(scope='function')
