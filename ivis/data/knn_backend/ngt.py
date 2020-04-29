@@ -1,14 +1,13 @@
 """ KNN retrieval using an NGT index. """
+from multiprocessing import Process, cpu_count
 
 import ngtpy
 import numpy as np
-from multiprocessing import cpu_count
-from operator import attrgetter
 from scipy.sparse import issparse
 from tqdm import tqdm
 
-from .abstract import KnnBackend
 from .abstract import IndexNeighbours, IndexBuildingError
+from .abstract import KnnBackend
 
 
 class NGTBackend(KnnBackend):
@@ -29,26 +28,23 @@ class NGTBackend(KnnBackend):
             produces when training. When set to 0, silences outputs, when
             above 0 will print outputs.
         """
-        super().__init__()
-        self.X = X
-        self.path = index_filepath
+        super().__init__(X, index_filepath, verbose=verbose)
         self.distance_metric = distance_metric
         self.ntrees = ntrees
-        self.verbose = verbose
 
     def load_index(self):
-        return ngtpy.Index(self.path)
+        return ngtpy.Index(self.index_filepath)
 
     def build_index(self):
         if self.distance_metric in ('Hamming', 'Jaccard'):
             object_type = 'Byte'
         else:
             object_type = 'Float'
-        ngtpy.create(self.path, self.X.shape[1],
+        ngtpy.create(self.index_filepath, self.X.shape[1],
                      edge_size_for_creation=self.ntrees,
                      distance_type=self.distance_metric,
                      object_type=object_type)
-        index = ngtpy.Index(self.path)
+        index = ngtpy.Index(self.index_filepath)
 
         if issparse(self.X):
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
@@ -80,31 +76,43 @@ class NGTBackend(KnnBackend):
         finally:
             index.close()
 
-    def extract_knn(self, k=150, search_k=0):
-        """ Starts multiple processes to retrieve nearest neighbours using
-            an NGT Index in parallel """
 
-        index = ngtpy.Index(self.path, read_only=True)
+class NGTKnnWorker(Process):
+    """
+    Upon construction, this worker process loads an annoy index from disk.
+    When started, the neighbours of the data-points specified by `data_indices`
+    will be retrieved from the index according to the provided parameters
+    and stored in the 'results_queue'.
 
-        neighbours = []
+    `data_indices` is a tuple of integers denoting the start and end range of
+    indices to retrieve.
+    """
+    def __init__(self, index_filepath, k, search_k, n_dims,
+                 data_indices, results_queue):
+        self.index_filepath = index_filepath
+        self.k = k
+        self.n_dims = n_dims
+        self.search_k = search_k
+        self.data_indices = data_indices
+        self.results_queue = results_queue
+        super(NGTKnnWorker, self).__init__()
+
+    def run(self):
+        index = ngtpy.Index(self.index_filepath, read_only=True)
         try:
-            for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
-                row = self.X[i, :]
+            for i in range(self.data_indices[0], self.data_indices[1]):
+                row = index.get_object(i)
                 neighbour_indices = index.search(row,
-                                                 size=k,
-                                                 edge_size=search_k,
+                                                 size=self.k,
+                                                 edge_size=self.search_k,
                                                  with_distance=False)
                 neighbour_indices = np.array(neighbour_indices,
                                              dtype=np.uint32)
-                neighbours.append(
+                self.results_queue.put(
                     IndexNeighbours(row_index=i,
                                     neighbour_list=neighbour_indices))
-        except Exception:
-            msg = "Error extracting KNN tree."
-            raise IndexBuildingError(msg)
-        else:
-            neighbours = sorted(neighbours, key=attrgetter('row_index'))
-            neighbours = list(map(attrgetter('neighbour_list'), neighbours))
-            return np.array(neighbours)
+        except Exception as e:
+            self.exception = e
         finally:
+            self.results_queue.close()
             index.close()

@@ -1,15 +1,13 @@
 """ KNN retrieval using an Annoy index. """
+from multiprocessing import Process
 
-import time
 import numpy as np
-from scipy.sparse import issparse
 from annoy import AnnoyIndex
-from multiprocessing import Process, cpu_count, Queue
-from operator import attrgetter
+from scipy.sparse import issparse
 from tqdm import tqdm
 
-from .abstract import KnnBackend
 from .abstract import IndexBuildingError, IndexNeighbours
+from .abstract import KnnBackend
 
 
 class AnnoyBackend(KnnBackend):
@@ -26,12 +24,9 @@ class AnnoyBackend(KnnBackend):
             produces when training. When set to 0, silences outputs, when
             above 0 will print outputs.
         """
-        super().__init__()
-        self.X = X
-        self.path = index_filepath
+        super().__init__(X, index_filepath, verbose=verbose)
         self.distance_metric = distance_metric
         self.ntrees = ntrees
-        self.verbose = verbose
 
     def load_index(self):
         return AnnoyIndex(self.X.shape[1], metric=self.distance_metric)
@@ -48,7 +43,7 @@ class AnnoyBackend(KnnBackend):
         """
         index = AnnoyIndex(self.X.shape[1], metric=self.distance_metric)
         if build_index_on_disk:
-            index.on_disk_build(self.path)
+            index.on_disk_build(self.index_filepath)
 
         if issparse(self.X):
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
@@ -67,63 +62,11 @@ class AnnoyBackend(KnnBackend):
             raise IndexBuildingError(msg)
         else:
             if not build_index_on_disk:
-                index.save(self.path)
+                index.save(self.index_filepath)
             return index
 
-    def extract_knn(self, k=150, search_k=-1):
-        """ Starts multiple processes to retrieve nearest neighbours using
-            an Annoy Index in parallel """
 
-        n_dims = self.X.shape[1]
-
-        chunk_size = self.X.shape[0] // cpu_count()
-        remainder = (self.X.shape[0] % cpu_count()) > 0
-        process_pool = []
-        results_queue = Queue()
-
-        # Split up the indices and assign processes for each chunk
-        i = 0
-        while (i + chunk_size) <= self.X.shape[0]:
-            process_pool.append(KNN_Worker(self.path, k, search_k, n_dims,
-                                           (i, i+chunk_size), results_queue))
-            i += chunk_size
-        if remainder:
-            batch_shape = (i, self.X.shape[0])
-            process_pool.append(KNN_Worker(self.path, k, search_k, n_dims,
-                                           batch_shape, results_queue))
-
-        try:
-            for process in process_pool:
-                process.start()
-
-            # Read from queue constantly to prevent it from becoming full
-            with tqdm(total=self.X.shape[0], disable=self.verbose < 1) as pbar:
-                neighbour_lst = []
-                neighbour_lst_len = len(neighbour_lst)
-                while any(process.is_alive() for process in process_pool):
-                    while not results_queue.empty():
-                        neighbour_lst.append(results_queue.get())
-                    progress = len(neighbour_lst) - neighbour_lst_len
-                    pbar.update(progress)
-                    neighbour_lst_len = len(neighbour_lst)
-                    time.sleep(0.1)
-
-                while not results_queue.empty():
-                    neighbour_lst.append(results_queue.get())
-
-            neighbour_lst = sorted(neighbour_lst, key=attrgetter('row_index'))
-            neighbour_lst = list(map(attrgetter('neighbour_list'), neighbour_lst))
-
-            return np.array(neighbour_lst)
-
-        except:
-            print('Halting KNN retrieval and cleaning up')
-            for process in process_pool:
-                process.terminate()
-            raise
-
-
-class KNN_Worker(Process):
+class AnnoyKnnWorker(Process):
     """
     Upon construction, this worker process loads an annoy index from disk.
     When started, the neighbours of the data-points specified by `data_indices`
@@ -141,7 +84,7 @@ class KNN_Worker(Process):
         self.search_k = search_k
         self.data_indices = data_indices
         self.results_queue = results_queue
-        super(KNN_Worker, self).__init__()
+        super(AnnoyKnnWorker, self).__init__()
 
     def run(self):
         try:

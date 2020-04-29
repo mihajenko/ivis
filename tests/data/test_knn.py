@@ -8,6 +8,7 @@ from annoy import AnnoyIndex
 from scipy.sparse import csr_matrix
 from sklearn import datasets
 
+from data.triplet_generators import get_knn_worker_cls
 from ivis.data.knn_backend.annoy import AnnoyBackend
 from ivis.data.knn_backend.ngt import NGTBackend
 
@@ -77,7 +78,7 @@ def test_index_with_ngt(ngt_index_file):
     for i in range(data.shape[0]):
         row_i = data[i, :]
         retrieved = np.array(loaded_index.get_object(i), dtype=np.uint8)
-        assert np.all(retrieved == row_i)
+        assert (retrieved == row_i).all()
 
     loaded_index.close()
 
@@ -92,9 +93,10 @@ def test_knn_retrieval():
     annoy_backend = AnnoyBackend(X, annoy_index_filepath,
                                  distance_metric='angular')
     annoy_backend.load_index()
-    neighbour_list = annoy_backend.extract_knn(k=4, search_k=-1)
+    worker_cls = get_knn_worker_cls(annoy_backend)
+    neighbour_list = annoy_backend.extract_knn(worker_cls, k=4, search_k=-1)
 
-    assert np.all(expected_neighbour_list == neighbour_list)
+    assert (expected_neighbour_list == neighbour_list).all()
 
 
 def test_knn_retrieval_with_ngt():
@@ -107,6 +109,8 @@ def test_knn_retrieval_with_ngt():
     ngt_backend = NGTBackend(X, ngt_index_filepath, distance_metric='Jaccard',
                              ntrees=50)
     ngt_backend.load_index()
-    neighbour_list = ngt_backend.extract_knn(k=4, search_k=-1)
 
-    assert np.all(expected_neighbour_list == neighbour_list)
+    worker_cls = get_knn_worker_cls(ngt_backend)
+    neighbour_list = ngt_backend.extract_knn(worker_cls, k=4, search_k=-1)
+
+    assert (expected_neighbour_list == neighbour_list).all()
