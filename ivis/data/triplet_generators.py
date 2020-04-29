@@ -14,8 +14,8 @@ a concern, dynamically generated triplets can be useful.
 """
 
 import numpy as np
-from tensorflow.keras.utils import Sequence
 from scipy.sparse import issparse
+from tensorflow.keras.utils import Sequence
 
 
 def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,

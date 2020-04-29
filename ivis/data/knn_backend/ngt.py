@@ -2,6 +2,7 @@
 
 import ngtpy
 import numpy as np
+from multiprocessing import cpu_count
 from operator import attrgetter
 from scipy.sparse import issparse
 from tqdm import tqdm
@@ -46,16 +47,26 @@ class NGTBackend(KnnBackend):
 
         if issparse(self.X):
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
+                # periodic save
+                if (i % 1000) == 0:
+                    index.save()
+
                 v = self.X[i].toarray()[0]
                 index.insert(v)
         else:
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
+                # batch save
+                if (i % 1000) == 0:
+                    index.save()
+
                 v = self.X[i]
                 index.insert(v)
 
+        # final save
+        index.save()
+
         try:
-            index.build_index()
-            index.save()
+            index.build_index(num_threads=cpu_count() - 1)
         except Exception:
             msg = "Error building NGT Index."
             raise IndexBuildingError(msg)
@@ -72,7 +83,7 @@ class NGTBackend(KnnBackend):
         for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
             row = self.X[i, :]
             neighbour_indexes = index.search(row, size=k, edge_size=search_k,
-                                            with_distance=False)
+                                             with_distance=False)
             neighbour_indexes = np.array(neighbour_indexes, dtype=np.uint32)
             neighbour_lst.append(
                 IndexNeighbours(row_index=i, neighbour_list=neighbour_indexes))
