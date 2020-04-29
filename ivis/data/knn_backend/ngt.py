@@ -40,14 +40,19 @@ class NGTBackend(KnnBackend):
         return ngtpy.Index(self.path)
 
     def build_index(self):
+        if self.distance_metric in ('Hamming', 'Jaccard'):
+            object_type = 'Byte'
+        else:
+            object_type = 'Float'
         ngtpy.create(self.path, self.X.shape[1],
                      edge_size_for_creation=self.ntrees,
-                     distance_type=self.distance_metric)
+                     distance_type=self.distance_metric,
+                     object_type=object_type)
         index = ngtpy.Index(self.path)
 
         if issparse(self.X):
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
-                # periodic save
+                # periodically save the inserts
                 if (i % 1000) == 0:
                     index.save()
 
@@ -55,23 +60,25 @@ class NGTBackend(KnnBackend):
                 index.insert(v)
         else:
             for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
-                # batch save
+                # periodically save the inserts
                 if (i % 1000) == 0:
                     index.save()
 
                 v = self.X[i]
                 index.insert(v)
 
-        # final save
+        # save the final inserts
         index.save()
 
         try:
             index.build_index(num_threads=cpu_count() - 1)
+            # save the KNN index
+            index.save()
         except Exception:
             msg = "Error building NGT Index."
             raise IndexBuildingError(msg)
-
-        return index
+        finally:
+            index.close()
 
     def extract_knn(self, k=150, search_k=0):
         """ Starts multiple processes to retrieve nearest neighbours using
@@ -79,16 +86,25 @@ class NGTBackend(KnnBackend):
 
         index = ngtpy.Index(self.path, read_only=True)
 
-        neighbour_lst = []
-        for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
-            row = self.X[i, :]
-            neighbour_indexes = index.search(row, size=k, edge_size=search_k,
-                                             with_distance=False)
-            neighbour_indexes = np.array(neighbour_indexes, dtype=np.uint32)
-            neighbour_lst.append(
-                IndexNeighbours(row_index=i, neighbour_list=neighbour_indexes))
-
-        neighbour_lst = sorted(neighbour_lst, key=attrgetter('row_index'))
-        neighbour_lst = list(map(attrgetter('neighbour_list'), neighbour_lst))
-
-        return np.array(neighbour_lst)
+        neighbours = []
+        try:
+            for i in tqdm(range(self.X.shape[0]), disable=self.verbose < 1):
+                row = self.X[i, :]
+                neighbour_indices = index.search(row,
+                                                 size=k,
+                                                 edge_size=search_k,
+                                                 with_distance=False)
+                neighbour_indices = np.array(neighbour_indices,
+                                             dtype=np.uint32)
+                neighbours.append(
+                    IndexNeighbours(row_index=i,
+                                    neighbour_list=neighbour_indices))
+        except Exception:
+            msg = "Error extracting KNN tree."
+            raise IndexBuildingError(msg)
+        else:
+            neighbours = sorted(neighbours, key=attrgetter('row_index'))
+            neighbours = list(map(attrgetter('neighbour_list'), neighbours))
+            return np.array(neighbours)
+        finally:
+            index.close()
