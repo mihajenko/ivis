@@ -1,26 +1,26 @@
 """ scikit-learn wrapper class for the Ivis algorithm. """
-from .data.triplet_generators import generator_from_index
-from .nn.network import triplet_network, base_network
-from .nn.callbacks import ModelCheckpoint
-from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
-from .nn.losses import semi_supervised_loss, validate_sparse_labels
-from .data.knn import build_annoy_index
-
-from tensorflow import keras
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.models import load_model, Model
-from tensorflow.keras.layers import Dense, Input
-from tensorflow.keras import regularizers
-import numpy as np
-
-from sklearn.base import BaseEstimator
-
 import json
-import os
-import shutil
 import multiprocessing
-import tensorflow as tf
+import os
 import platform
+import shutil
+
+import numpy as np
+import tensorflow as tf
+from sklearn.base import BaseEstimator
+from tensorflow import keras
+from tensorflow.keras import regularizers
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.models import load_model, Model
+
+from .data.knn_backend.annoy import AnnoyBackend
+from .data.knn_backend.ngt import NGTBackend
+from .data.triplet_generators import generator_from_index
+from .nn.callbacks import ModelCheckpoint
+from .nn.losses import semi_supervised_loss, validate_sparse_labels
+from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
+from .nn.network import triplet_network, base_network
 
 
 class Ivis(BaseEstimator):
@@ -76,7 +76,7 @@ class Ivis(BaseEstimator):
         weighting to give to classification vs triplet loss when training
         in supervised mode. The higher the weight, the more classification
         influences training. Ignored if using Ivis in unsupervised mode.
-    :param str annoy_index_path: The filepath of a pre-trained annoy index file
+    :param str index_path: The filepath of a pre-trained annoy index file
         saved on disk. If provided, the annoy index file will be used.
         Otherwise, a new index will be generated and saved to disk in the
         current directory as 'annoy.index'.
@@ -93,16 +93,19 @@ class Ivis(BaseEstimator):
 
     """
 
-    def __init__(self, embedding_dims=2, k=150, distance='pn', batch_size=128,
+    def __init__(self, embedding_dims=2, k=150,
+                 knn_metric='angular', distance='pn', batch_size=128,
                  epochs=1000, n_epochs_without_progress=20,
                  margin=1, ntrees=50, search_k=-1,
                  precompute=True, model='szubert',
                  supervision_metric='sparse_categorical_crossentropy',
-                 supervision_weight=0.5, annoy_index_path=None,
-                 callbacks=[], build_index_on_disk=None, verbose=1):
+                 supervision_weight=0.5, index_path=None,
+                 callbacks=[], build_index_on_disk=None, verbose=1,
+                 index_backend='annoy'):
 
         self.embedding_dims = embedding_dims
         self.k = k
+        self.knn_metric = knn_metric
         self.distance = distance
         self.batch_size = batch_size
         self.epochs = epochs
@@ -118,7 +121,8 @@ class Ivis(BaseEstimator):
         self.supervision_weight = supervision_weight
         self.supervised_model_ = None
         self.loss_history_ = []
-        self.annoy_index_path = annoy_index_path
+        self.index_backend = index_backend
+        self.index_path = index_path
         self.callbacks = callbacks
         for callback in self.callbacks:
             if isinstance(callback, ModelCheckpoint):
@@ -146,18 +150,34 @@ class Ivis(BaseEstimator):
         return state
 
     def _fit(self, X, Y=None, shuffle_mode=True):
+        if self.index_backend == 'ngt':
+            backend_cls = NGTBackend
+            tmp_index_path = 'ngt.index'
+        else:
+            backend_cls = AnnoyBackend
+            tmp_index_path = 'annoy.index'
 
-        if self.annoy_index_path is None:
-            self.annoy_index_path = 'annoy.index'
+        build_knn = False
+        if self.index_path is None:
+            self.index_path = tmp_index_path
+            build_knn = True
+
+        index_backend = backend_cls(X, self.index_path,
+                                    distance_metric=self.knn_metric,
+                                    ntrees=self.ntrees,
+                                    verbose=self.verbose)
+
+        if build_knn:
             if self.verbose > 0:
                 print('Building KNN index')
-            build_annoy_index(X, self.annoy_index_path,
-                              ntrees=self.ntrees,
-                              build_index_on_disk=self.build_index_on_disk,
-                              verbose=self.verbose)
+            if self.index_backend == 'annoy':
+                index_backend.build_index(
+                    build_index_on_disk=self.build_index_on_disk)
+            else:
+                index_backend.build_index()
 
         datagen = generator_from_index(X, Y,
-                                       index_path=self.annoy_index_path,
+                                       index_backend=index_backend,
                                        k=self.k,
                                        batch_size=self.batch_size,
                                        search_k=self.search_k,

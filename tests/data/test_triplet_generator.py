@@ -3,6 +3,7 @@ import pytest
 
 from sklearn import datasets
 
+from ivis.data.knn_backend.annoy import AnnoyBackend
 from ivis.data.triplet_generators import generator_from_index
 from ivis.data.triplet_generators import KnnTripletGenerator
 from ivis.data.triplet_generators import AnnoyTripletGenerator
@@ -55,21 +56,22 @@ def test_AnnoyTripletGenerator():
 
 
 def test_generator_from_index():
-        # Test too large k raises exception
-        with pytest.raises(Exception):
-                generator_from_index(np.zeros(shape=(4, 5)), 
-                                     'placeholder_path.index',
-                                     k=10,
-                                     batch_size=2,
-                                     search_k=1,
-                                     precompute=False,
-                                     verbose=0)
-        # Test too large batch_size raises exception
-        with pytest.raises(Exception):
-                generator_from_index(np.zeros(shape=(4, 5)), 
-                                     'placeholder_path.index',
-                                     k=2,
-                                     batch_size=8,
-                                     search_k=1,
-                                     precompute=False,
-                                     verbose=0)
+    index_path = 'placeholder_path.index'
+
+    # Test too large k raises exception
+    with pytest.raises(Exception):
+        X = np.zeros(shape=(4, 5))
+        index_backend = AnnoyBackend(X, index_filepath=index_path)
+        generator_from_index(X, Y=None,
+                             index_backend=index_backend, precompute=False,
+                             k=10, search_k=1, batch_size=2,
+                             verbose=0)
+
+    # Test too large batch_size raises exception
+    with pytest.raises(Exception):
+        X = np.zeros(shape=(4, 5))
+        index_backend = AnnoyBackend(X, index_filepath=index_path)
+        generator_from_index(X, Y=None,
+                             index_backend=index_backend, precompute=False,
+                             k=2, search_k=1, batch_size=8,
+                             verbose=0)
