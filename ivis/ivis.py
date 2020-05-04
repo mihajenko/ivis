@@ -1,9 +1,9 @@
 """ scikit-learn wrapper class for the Ivis algorithm. """
 import json
-import multiprocessing
 import os
 import platform
 import shutil
+from multiprocessing import cpu_count
 
 import numpy as np
 import tensorflow as tf
@@ -14,13 +14,14 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.models import load_model, Model
 
-from .data.knn_backend.annoy import AnnoyBackend
-from .data.knn_backend.ngt import NGTBackend
-from .data.triplet_generators import generator_from_index
-from .nn.callbacks import ModelCheckpoint
-from .nn.losses import semi_supervised_loss, validate_sparse_labels
-from .nn.losses import triplet_loss, is_categorical, is_multiclass, is_hinge
-from .nn.network import triplet_network, base_network
+from ivis.data.knn_backend.annoy import AnnoyBackend
+from ivis.data.knn_backend.ngt import NGTBackend
+from ivis.data.triplet_generators import generator_from_index
+from ivis.nn.callbacks import ModelCheckpoint
+from ivis.nn.losses import semi_supervised_loss, validate_sparse_labels
+from ivis.nn.losses import triplet_loss, is_categorical, is_multiclass, \
+    is_hinge
+from ivis.nn.network import triplet_network, base_network
 
 
 class Ivis(BaseEstimator):
@@ -100,8 +101,10 @@ class Ivis(BaseEstimator):
                  precompute=True, model='szubert',
                  supervision_metric='sparse_categorical_crossentropy',
                  supervision_weight=0.5, index_path=None,
-                 callbacks=[], build_index_on_disk=None, verbose=1,
-                 index_backend='annoy'):
+                 callbacks=[],
+                 build_index_on_disk=None,
+                 use_shared_memory=False,
+                 verbose=1, index_backend='annoy'):
 
         self.embedding_dims = embedding_dims
         self.k = k
@@ -131,6 +134,7 @@ class Ivis(BaseEstimator):
             self.build_index_on_disk = True if platform.system() != 'Windows' else False
         else:
             self.build_index_on_disk = build_index_on_disk
+        self.use_shared_memory = use_shared_memory
         self.verbose = verbose
 
     def __getstate__(self):
@@ -150,31 +154,24 @@ class Ivis(BaseEstimator):
         return state
 
     def _fit(self, X, Y=None, shuffle_mode=True):
-        if self.index_backend == 'ngt':
-            backend_cls = NGTBackend
-            tmp_index_path = 'ngt.index'
+        if self.index_backend == 'annoy':
+            index_backend = AnnoyBackend(
+                X, self.index_path or 'annoy.index',
+                distance_metric=self.knn_metric,
+                build_index_on_disk=self.build_index_on_disk,
+                ntrees=self.ntrees,
+                verbose=self.verbose)
         else:
-            backend_cls = AnnoyBackend
-            tmp_index_path = 'annoy.index'
+            index_backend = NGTBackend(
+                X, self.index_path or 'ngt.index',
+                distance_metric=self.knn_metric,
+                ntrees=self.ntrees,
+                verbose=self.verbose)
 
-        build_knn = False
-        if self.index_path is None:
-            self.index_path = tmp_index_path
-            build_knn = True
-
-        index_backend = backend_cls(X, self.index_path,
-                                    distance_metric=self.knn_metric,
-                                    ntrees=self.ntrees,
-                                    verbose=self.verbose)
-
-        if build_knn:
-            if self.verbose > 0:
-                print('Building KNN index')
-            if self.index_backend == 'annoy':
-                index_backend.build_index(
-                    build_index_on_disk=self.build_index_on_disk)
-            else:
-                index_backend.build_index()
+        # if index_backend.index_filepath and not os.path.exists(index_backend.index_filepath):
+        #     if self.verbose > 0:
+        #         print('Building KNN index')
+        #         index_backend.build_index()
 
         datagen = generator_from_index(X, Y,
                                        index_backend=index_backend,
@@ -283,7 +280,7 @@ class Ivis(BaseEstimator):
                       [EarlyStopping(monitor=loss_monitor,
                        patience=self.n_epochs_without_progress)],
             shuffle=shuffle_mode,
-            workers=multiprocessing.cpu_count(),
+            workers=cpu_count(),
             verbose=self.verbose)
         self.loss_history_ += hist.history['loss']
 

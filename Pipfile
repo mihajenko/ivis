@@ -6,13 +6,18 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-tensorflow = "*"
 numpy = "*"
 scikit-learn = ">0.20.0"
 tqdm = "*"
 annoy = ">=1.15.2"
 pytest = "*"
+pybind11 = "*"
 ngt = "*"
+tf-nightly = "==2.2.0.dev20200504"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true
+

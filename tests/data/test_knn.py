@@ -1,9 +1,10 @@
-import ngtpy
-import numpy as np
 import os
-import pytest
 import shutil
 import tempfile
+
+import ngtpy
+import numpy as np
+import pytest
 from annoy import AnnoyIndex
 from scipy.sparse import csr_matrix
 from sklearn import datasets
@@ -31,8 +32,9 @@ def test_build_sparse_annoy_index(annoy_index_file):
     data = np.random.choice([0, 1], size=(10, 5))
     sparse_data = csr_matrix(data)
 
-    annoy_backend = AnnoyBackend(sparse_data, annoy_index_file)
-    index = annoy_backend.build_index(build_index_on_disk=False)
+    annoy_backend = AnnoyBackend(sparse_data, annoy_index_file,
+                                 build_index_on_disk=False)
+    index = annoy_backend.build_index()
 
     assert os.path.exists(annoy_index_file)
 
@@ -50,8 +52,9 @@ def test_build_sparse_annoy_index(annoy_index_file):
 def test_dense_annoy_index(annoy_index_file):
     data = np.random.choice([0, 1], size=(10, 5))
 
-    annoy_backend = AnnoyBackend(data, annoy_index_file)
-    index = annoy_backend.build_index(build_index_on_disk=False)
+    annoy_backend = AnnoyBackend(data, annoy_index_file,
+                                 build_index_on_disk=False)
+    index = annoy_backend.build_index()
 
     assert os.path.exists(annoy_index_file)
 
@@ -91,8 +94,8 @@ def test_knn_retrieval():
     X = iris.data
 
     annoy_backend = AnnoyBackend(X, annoy_index_filepath,
-                                 distance_metric='angular')
-    annoy_backend.load_index()
+                                 distance_metric='angular',
+                                 build_index_on_disk=False)
     worker_cls = get_knn_worker_cls(annoy_backend)
     neighbour_list = annoy_backend.extract_knn(worker_cls, k=4, search_k=-1)
 
@@ -106,10 +109,9 @@ def test_knn_retrieval_with_ngt():
     iris = datasets.load_iris()
     X = iris.data
 
-    ngt_backend = NGTBackend(X, ngt_index_filepath, distance_metric='Jaccard',
+    ngt_backend = NGTBackend(X, ngt_index_filepath,
+                             distance_metric='Jaccard',
                              ntrees=50)
-    ngt_backend.load_index()
-
     worker_cls = get_knn_worker_cls(ngt_backend)
     neighbour_list = ngt_backend.extract_knn(worker_cls, k=4, search_k=-1)
 

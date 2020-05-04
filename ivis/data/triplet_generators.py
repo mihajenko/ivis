@@ -18,8 +18,8 @@ from scipy.sparse import issparse
 from tensorflow.keras.utils import Sequence
 
 import ivis.data.knn_backend.ngt as ngt
-from .knn_backend.annoy import AnnoyKnnWorker
-from .knn_backend.ngt import NGTKnnWorker
+from ivis.data.knn_backend.annoy import AnnoyKnnWorker
+from ivis.data.knn_backend.ngt import NGTKnnWorker
 
 
 def get_knn_worker_cls(index_backend):
@@ -48,14 +48,18 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
             if verbose > 0:
                 print('Extracting KNN from index')
 
-            worker_cls = get_knn_worker_cls(index_backend)
+            if isinstance(index_backend, ngt.NGTBackend):
+                worker_cls = NGTKnnWorker
+            else:
+                worker_cls = AnnoyKnnWorker
+            # worker_cls = get_knn_worker_cls(index_backend)
+
             neighbour_matrix = index_backend.extract_knn(worker_cls, k=k,
                                                          search_k=search_k)
             return KnnTripletGenerator(X, neighbour_matrix,
                                        batch_size=batch_size)
         else:
-            index = index_backend.load_index()
-            return AnnoyTripletGenerator(X, index, k=k,
+            return AnnoyTripletGenerator(X, index_backend.index, k=k,
                                          batch_size=batch_size,
                                          search_k=search_k)
     else:
@@ -69,8 +73,7 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
             return LabeledKnnTripletGenerator(X, Y, neighbour_matrix,
                                               batch_size=batch_size)
         else:
-            index = index_backend.load_index()
-            return LabeledAnnoyTripletGenerator(X, Y, index,
+            return LabeledAnnoyTripletGenerator(X, Y, index_backend.index,
                                                 k=k, batch_size=batch_size,
                                                 search_k=search_k)
 

@@ -61,7 +61,7 @@ def test_generator_from_index():
     # Test too large k raises exception
     with pytest.raises(Exception):
         X = np.zeros(shape=(4, 5))
-        index_backend = AnnoyBackend(X, index_filepath=index_path)
+        index_backend = AnnoyBackend(X, index_path)
         generator_from_index(X, Y=None,
                              index_backend=index_backend, precompute=False,
                              k=10, search_k=1, batch_size=2,
@@ -70,7 +70,7 @@ def test_generator_from_index():
     # Test too large batch_size raises exception
     with pytest.raises(Exception):
         X = np.zeros(shape=(4, 5))
-        index_backend = AnnoyBackend(X, index_filepath=index_path)
+        index_backend = AnnoyBackend(X)
         generator_from_index(X, Y=None,
                              index_backend=index_backend, precompute=False,
                              k=2, search_k=1, batch_size=8,
