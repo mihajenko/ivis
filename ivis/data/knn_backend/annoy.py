@@ -44,6 +44,9 @@ class AnnoyBackend(KnnBackend):
             self.index.load(self.index_filepath)
 
         else:  # build a standalone annoy index
+            if verbose > 0:
+                print('Building KNN index')
+
             if self.build_index_on_disk:
                 self.index.on_disk_build(self.index_filepath)
 
@@ -64,8 +67,6 @@ class AnnoyBackend(KnnBackend):
             raise IndexBuildingError(msg)
 
         super().__init__(self.index, self.X.shape, verbose=verbose)
-        del self.X
-        gc.collect()
 
 
 class AnnoyKnnWorker(Process):

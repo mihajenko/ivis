@@ -47,6 +47,9 @@ class NGTBackend(KnnBackend):
             self.index = ngtpy.Index(self.index_filepath)
 
         else:  # build a standalone NGT index
+            if verbose > 0:
+                print('Building KNN index')
+
             ngtpy.create(self.index_filepath, self.X.shape[1],
                          edge_size_for_creation=self.ntrees,
                          distance_type=self.distance_metric,
@@ -73,8 +76,6 @@ class NGTBackend(KnnBackend):
                 raise IndexBuildingError(msg)
 
         super().__init__(self.index, self.X.shape, verbose=verbose)
-        del self.X
-        gc.collect()
 
 
 class NGTKnnWorker(Process):

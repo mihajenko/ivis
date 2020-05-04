@@ -12,11 +12,11 @@ tqdm = "*"
 annoy = ">=1.15.2"
 pytest = "*"
 pybind11 = "*"
-ngt = "*"
+# ngt = "*"  # please install from NGT package
 tf-nightly = "==2.2.0.dev20200504"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
 
 [pipenv]
 allow_prereleases = true

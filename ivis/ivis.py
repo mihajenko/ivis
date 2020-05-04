@@ -168,11 +168,6 @@ class Ivis(BaseEstimator):
                 ntrees=self.ntrees,
                 verbose=self.verbose)
 
-        # if index_backend.index_filepath and not os.path.exists(index_backend.index_filepath):
-        #     if self.verbose > 0:
-        #         print('Building KNN index')
-        #         index_backend.build_index()
-
         datagen = generator_from_index(X, Y,
                                        index_backend=index_backend,
                                        k=self.k,
