@@ -138,6 +138,7 @@ class Ivis(BaseEstimator):
         else:
             self.build_index_on_disk = build_index_on_disk
         self.use_shared_memory = use_shared_memory
+        self.shm = None
         self.verbose = verbose
 
     def __getstate__(self):
@@ -159,8 +160,8 @@ class Ivis(BaseEstimator):
     def _fit(self, X, Y=None, shuffle_mode=True):
         if self.use_shared_memory:
             shm_name = next(tempfile._get_candidate_names())
-            shm = SharedMemory(name=shm_name, create=True, size=X.nbytes)
-            X_shared = np.ndarray(X.shape, dtype=X.dtype, buffer=shm.buf)
+            self.shm = SharedMemory(name=shm_name, create=True, size=X.nbytes)
+            X_shared = np.ndarray(X.shape, dtype=X.dtype, buffer=self.shm.buf)
             X_shared[:, :] = X[:, :]
             X = X_shared
             gc.collect()
@@ -290,6 +291,11 @@ class Ivis(BaseEstimator):
             workers=cpu_count(),
             verbose=self.verbose)
         self.loss_history_ += hist.history['loss']
+
+        if isinstance(self.shm, SharedMemory):
+            self.shm.close()
+            self.shm.unlink()
+            self.shm = 'SharedMemory'
 
     def fit(self, X, Y=None, shuffle_mode=True):
         """Fit an ivis model.
