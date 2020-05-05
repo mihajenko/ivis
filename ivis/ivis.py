@@ -1,12 +1,9 @@
 """ scikit-learn wrapper class for the Ivis algorithm. """
-import gc
 import json
 import os
 import platform
 import shutil
-import tempfile
 from multiprocessing import cpu_count
-from multiprocessing.shared_memory import SharedMemory
 
 import numpy as np
 import tensorflow as tf
@@ -104,9 +101,7 @@ class Ivis(BaseEstimator):
                  precompute=True, model='szubert',
                  supervision_metric='sparse_categorical_crossentropy',
                  supervision_weight=0.5, index_path=None,
-                 callbacks=[],
-                 build_index_on_disk=None,
-                 use_shared_memory=False,
+                 callbacks=[], build_index_on_disk=None,
                  verbose=1, index_backend='annoy'):
 
         self.embedding_dims = embedding_dims
@@ -137,8 +132,6 @@ class Ivis(BaseEstimator):
             self.build_index_on_disk = True if platform.system() != 'Windows' else False
         else:
             self.build_index_on_disk = build_index_on_disk
-        self.use_shared_memory = use_shared_memory
-        self.shm = None
         self.verbose = verbose
 
     def __getstate__(self):
@@ -158,14 +151,6 @@ class Ivis(BaseEstimator):
         return state
 
     def _fit(self, X, Y=None, shuffle_mode=True):
-        if self.use_shared_memory:
-            shm_name = next(tempfile._get_candidate_names())
-            self.shm = SharedMemory(name=shm_name, create=True, size=X.nbytes)
-            X_shared = np.ndarray(X.shape, dtype=X.dtype, buffer=self.shm.buf)
-            X_shared[:, :] = X[:, :]
-            X = X_shared
-            gc.collect()
-
         if self.index_backend == 'annoy':
             index_backend = AnnoyBackend(
                 X, self.index_path or 'annoy.index',
@@ -291,11 +276,6 @@ class Ivis(BaseEstimator):
             workers=cpu_count(),
             verbose=self.verbose)
         self.loss_history_ += hist.history['loss']
-
-        if isinstance(self.shm, SharedMemory):
-            self.shm.close()
-            self.shm.unlink()
-            self.shm = 'SharedMemory'
 
     def fit(self, X, Y=None, shuffle_mode=True):
         """Fit an ivis model.
