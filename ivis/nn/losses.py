@@ -104,7 +104,7 @@ def _chebyshev_distance(x, y):
 
 
 def _cosine_distance(x, y):
-    return tf.losses.cosine_distance(tf.nn.l2_normalize(x, 0), tf.nn.l2_normalize(y, 0), axis=0)
+    return tf.losses.cosine_similarity(tf.nn.l2_normalize(x, 0), tf.nn.l2_normalize(y, 0), axis=0)
 
 
 def pn_loss(margin=1):
