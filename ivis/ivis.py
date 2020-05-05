@@ -398,11 +398,11 @@ class Ivis(BaseEstimator):
         self.__dict__ = ivis_config
 
         loss_function = triplet_loss(self.distance, self.margin)
-        self.model_ = load_model(os.path.join(folder_path, 'ivis_model.h5'),
-                                 custom_objects={'tf': tf,
-                                                 loss_function.__name__: loss_function })
+        self.model_: Model = load_model(
+            os.path.join(folder_path, 'ivis_model.h5'),
+            custom_objects={'tf': tf, loss_function.__name__: loss_function}
+        )
         self.encoder = self.model_.layers[3]
-        self.encoder._make_predict_function()
 
         # If a supervised model exists, load it
         supervised_path = os.path.join(folder_path, 'supervised_model.h5')
