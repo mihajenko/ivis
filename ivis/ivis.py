@@ -1,9 +1,12 @@
 """ scikit-learn wrapper class for the Ivis algorithm. """
+import gc
 import json
 import os
 import platform
 import shutil
+import tempfile
 from multiprocessing import cpu_count
+from multiprocessing.shared_memory import SharedMemory
 
 import numpy as np
 import tensorflow as tf
@@ -154,6 +157,14 @@ class Ivis(BaseEstimator):
         return state
 
     def _fit(self, X, Y=None, shuffle_mode=True):
+        if self.use_shared_memory:
+            shm_name = next(tempfile._get_candidate_names())
+            shm = SharedMemory(name=shm_name, create=True, size=X.nbytes)
+            X_shared = np.ndarray(X.shape, dtype=X.dtype, buffer=shm.buf)
+            X_shared[:, :] = X[:, :]
+            X = X_shared
+            gc.collect()
+
         if self.index_backend == 'annoy':
             index_backend = AnnoyBackend(
                 X, self.index_path or 'annoy.index',
@@ -167,6 +178,7 @@ class Ivis(BaseEstimator):
                 distance_metric=self.knn_metric,
                 ntrees=self.ntrees,
                 verbose=self.verbose)
+
 
         datagen = generator_from_index(X, Y,
                                        index_backend=index_backend,
@@ -295,7 +307,6 @@ class Ivis(BaseEstimator):
         -------
         returns an instance of self
         """
-
         self._fit(X, Y, shuffle_mode)
         return self
 

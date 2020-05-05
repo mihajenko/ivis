@@ -1,5 +1,4 @@
 """ KNN retrieval using an Annoy index. """
-import gc
 import os
 from multiprocessing import Process
 
@@ -103,5 +102,3 @@ class AnnoyKnnWorker(Process):
                                     neighbour_list=neighbour_indexes))
         except Exception as e:
             self.exception = e
-        finally:
-            self.results_queue.close()

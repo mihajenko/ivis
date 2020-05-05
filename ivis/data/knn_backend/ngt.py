@@ -1,5 +1,4 @@
 """ KNN retrieval using an NGT index. """
-import gc
 import os
 from multiprocessing import Process, cpu_count
 
@@ -103,9 +102,9 @@ class NGTKnnWorker(Process):
             for i in range(self.data_indices[0], self.data_indices[1]):
                 row = self.index.get_object(i)
                 neighbour_indices = self.index.search(row,
-                                                 size=self.k,
-                                                 edge_size=self.search_k,
-                                                 with_distance=False)
+                                                      size=self.k,
+                                                      edge_size=self.search_k,
+                                                      with_distance=False)
                 neighbour_indices = np.array(neighbour_indices,
                                              dtype=np.uint32)
                 self.results_queue.put(
@@ -113,5 +112,3 @@ class NGTKnnWorker(Process):
                                     neighbour_list=neighbour_indices))
         except Exception as e:
             self.exception = e
-        finally:
-            self.results_queue.close()

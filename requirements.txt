@@ -1,4 +1,4 @@
-tensorflow
+tf-nightly==2.2.0.dev20200504
 numpy
 scikit-learn>0.20.0
 tqdm

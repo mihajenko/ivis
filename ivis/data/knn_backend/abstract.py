@@ -1,6 +1,6 @@
 import time
 from collections import namedtuple
-from multiprocessing import cpu_count, Queue
+from multiprocessing import cpu_count, Manager
 from operator import attrgetter
 
 import numpy as np
@@ -27,7 +27,7 @@ class KnnBackend:
         chunk_size = self.shape[0] // threads
         remainder = (self.shape[0] % threads) > 0
         process_pool = []
-        results_queue = Queue()
+        results_queue = Manager().Queue()
 
         # Split up the indices and assign processes for each chunk
         i = 0
@@ -47,17 +47,15 @@ class KnnBackend:
             # Read from queue constantly to prevent it from becoming full
             with tqdm(total=self.shape[0], disable=self.verbose < 1) as pbar:
                 neighbours = []
-                neighbour_lst_len = len(neighbours)
                 while any(process.is_alive() for process in process_pool):
                     while not results_queue.empty():
                         neighbours.append(results_queue.get())
-                    progress = len(neighbours) - neighbour_lst_len
-                    pbar.update(progress)
-                    neighbour_lst_len = len(neighbours)
-                    time.sleep(2)
+                        pbar.update(1)
+                    time.sleep(0.1)
 
                 while not results_queue.empty():
                     neighbours.append(results_queue.get())
+                    pbar.update(1)
 
             neighbours = sorted(neighbours, key=attrgetter('row_index'))
             neighbours = list(map(attrgetter('neighbour_list'), neighbours))
