@@ -165,7 +165,6 @@ class Ivis(BaseEstimator):
                 ntrees=self.ntrees,
                 verbose=self.verbose)
 
-
         datagen = generator_from_index(X, Y,
                                        index_backend=index_backend,
                                        k=self.k,
