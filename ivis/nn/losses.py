@@ -104,7 +104,7 @@ def _chebyshev_distance(x, y):
 
 
 def _cosine_distance(x, y):
-    return tf.losses.cosine_similarity(tf.nn.l2_normalize(x, 0), tf.nn.l2_normalize(y, 0), axis=0)
+    return tf.losses.cosine_similarity(x, y, axis=0)
 
 
 def pn_loss(margin=1):
@@ -175,7 +175,7 @@ def chebyshev_pn_loss(margin=1):
 
 def cosine_loss(margin=1):
     def _cosine_loss(y_true, y_pred):
-        anchor, positive, negative = tf.unstack(y_pred)        
+        anchor, positive, negative = tf.unstack(y_pred)
         return K.mean(K.maximum(_cosine_distance(anchor, positive) - _cosine_distance(anchor, negative) + margin, 0))
     return _cosine_loss
 
