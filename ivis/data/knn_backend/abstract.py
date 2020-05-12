@@ -19,13 +19,13 @@ class KnnBackend:
         self.shape = shape
         self.verbose = verbose
 
-    def extract_knn(self, worker_cls, k=150, search_k=0):
+    def extract_knn(self, worker_cls, k=150, search_k=0, n_workers=2):
         """ Starts multiple processes to retrieve nearest neighbours using
             either an Annoy Index or NGT index, in parallel. """
         n_dims = self.shape[1]
-        threads = cpu_count() - 1
-        chunk_size = self.shape[0] // threads
-        remainder = (self.shape[0] % threads) > 0
+        n_workers = n_workers
+        chunk_size = self.shape[0] // n_workers
+        remainder = (self.shape[0] % n_workers) > 0
         process_pool = []
         results_queue = Manager().Queue()
 

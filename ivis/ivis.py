@@ -52,6 +52,8 @@ class Ivis(BaseEstimator):
     :param int ntrees: The number of random projections trees built by Annoy to
         approximate KNN. The more trees the higher the memory usage, but the
         better the accuracy of results.
+    :param int n_workers: How many workers should Python's `multiprocessing`
+                          directives spawn
     :param int search_k: The maximum number of nodes inspected during a nearest
         neighbour query by Annoy. The higher, the more computation time
         required, but the higher the accuracy. The default is n_trees * k,
@@ -97,7 +99,7 @@ class Ivis(BaseEstimator):
     def __init__(self, embedding_dims=2, k=150,
                  knn_metric='angular', distance='pn', batch_size=128,
                  epochs=1000, n_epochs_without_progress=20,
-                 margin=1, ntrees=50, search_k=-1,
+                 margin=1, ntrees=50, n_workers=-1, search_k=-1,
                  precompute=True, model='szubert',
                  supervision_metric='sparse_categorical_crossentropy',
                  supervision_weight=0.5, index_path=None,
@@ -113,6 +115,7 @@ class Ivis(BaseEstimator):
         self.n_epochs_without_progress = n_epochs_without_progress
         self.margin = margin
         self.ntrees = ntrees
+        self.n_workers = n_workers if n_workers > 0 else cpu_count()
         self.search_k = search_k
         self.precompute = precompute
         self.model_def = model
@@ -171,7 +174,8 @@ class Ivis(BaseEstimator):
                                        batch_size=self.batch_size,
                                        search_k=self.search_k,
                                        precompute=self.precompute,
-                                       verbose=self.verbose)
+                                       verbose=self.verbose,
+                                       n_workers=self.n_workers)
 
         loss_monitor = 'loss'
         try:
@@ -272,7 +276,7 @@ class Ivis(BaseEstimator):
                       [EarlyStopping(monitor=loss_monitor,
                        patience=self.n_epochs_without_progress)],
             shuffle=shuffle_mode,
-            workers=cpu_count(),
+            workers=self.n_workers,
             verbose=self.verbose)
         self.loss_history_ += hist.history['loss']
 

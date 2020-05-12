@@ -33,7 +33,7 @@ def get_knn_worker_cls(index_backend):
 
 
 def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
-                         precompute=True, verbose=1):
+                         precompute=True, n_workers=1, verbose=1):
     if k >= X.shape[0] - 1:
         raise Exception('''k value greater than or equal to (num_rows - 1)
                         (k={}, rows={}). Lower k to a smaller
@@ -55,7 +55,8 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
             # worker_cls = get_knn_worker_cls(index_backend)
 
             neighbour_matrix = index_backend.extract_knn(worker_cls, k=k,
-                                                         search_k=search_k)
+                                                         search_k=search_k,
+                                                         n_workers=n_workers)
             return KnnTripletGenerator(X, neighbour_matrix,
                                        batch_size=batch_size)
         else:
@@ -69,7 +70,8 @@ def generator_from_index(X, Y, index_backend, k, batch_size, search_k=-1,
 
             worker_cls = get_knn_worker_cls(index_backend)
             neighbour_matrix = index_backend.extract_knn(worker_cls, k=k,
-                                                         search_k=search_k)
+                                                         search_k=search_k,
+                                                         n_workers=n_workers)
             return LabeledKnnTripletGenerator(X, Y, neighbour_matrix,
                                               batch_size=batch_size)
         else:
