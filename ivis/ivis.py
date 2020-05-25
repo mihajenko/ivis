@@ -70,6 +70,7 @@ class Ivis(BaseEstimator):
         network will be created, which is a selu network composed of 3 dense
         layers of 128 neurons each, followed by an embedding layer of size
         'embedding_dims'.
+    :param optimizer: Learning optimizer
     :param str supervision_metric: str or function. The supervision metric to
         optimize when training keras in supervised mode. Supports all of the
         classification or regression losses included with keras, so long as
@@ -100,7 +101,7 @@ class Ivis(BaseEstimator):
                  knn_metric='angular', distance='pn', batch_size=128,
                  epochs=1000, n_epochs_without_progress=20,
                  margin=1, ntrees=50, n_workers=-1, search_k=-1,
-                 precompute=True, model='szubert',
+                 precompute=True, model='szubert', optimizer='adam',
                  supervision_metric='sparse_categorical_crossentropy',
                  supervision_weight=0.5, index_path=None,
                  callbacks=[], build_index_on_disk=None,
@@ -121,6 +122,7 @@ class Ivis(BaseEstimator):
         self.model_def = model
         self.model_ = None
         self.encoder = None
+        self.optimizer = optimizer
         self.supervision_metric = supervision_metric
         self.supervision_weight = supervision_weight
         self.supervised_model_ = None
@@ -196,7 +198,8 @@ class Ivis(BaseEstimator):
                                     embedding_dims=self.embedding_dims)
 
             if Y is None:
-                self.model_.compile(optimizer='adam', loss=triplet_loss_func)
+                self.model_.compile(optimizer=self.optimizer,
+                                    loss=triplet_loss_func)
             else:
                 if is_categorical(self.supervision_metric):
                     if not is_multiclass(self.supervision_metric):
@@ -248,7 +251,7 @@ class Ivis(BaseEstimator):
                                                supervised_output])
                 self.model_ = final_network
                 self.model_.compile(
-                    optimizer='adam',
+                    optimizer=self.optimizer,
                     loss={
                         'stacked_triplets': triplet_loss_func,
                         'supervised': supervised_loss
